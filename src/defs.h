@@ -15,6 +15,7 @@ typedef struct {
     const String name;
     const unsigned long irCode;
     NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> *strip;
+    bool state;
 } Area; 
 
 #define ALL_AREAS_CODE 0xFD00FF
@@ -27,8 +28,8 @@ typedef struct {
 
 
 int decodeRemoteCommands(const unsigned long *data);
-int activateArea(const Area *area);
-int deactivateArea(const Area *area);
-int setArea(const Area *area, RgbColor color);
+int activateArea(Area *area);
+int deactivateArea(Area *area);
+int setArea(Area *area, RgbColor color);
 
 #endif
