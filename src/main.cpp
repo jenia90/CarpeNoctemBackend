@@ -1,8 +1,6 @@
 #include "defs.h"
-#include <NeoPixelBus.h>
 #include <IRremote.h>
 
-#define NUM_OF_AREAS 5
 
 // Define areas
 Area areas[NUM_OF_AREAS] = {
@@ -13,8 +11,10 @@ Area areas[NUM_OF_AREAS] = {
     {5, 9, "Area 5", AREA_FIVE_CODE, new NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod>(5, 9), false},
 };
 
+NeoPixelAnimator animations(NUM_OF_AREAS);
+AnimState animStates[NUM_OF_AREAS];
+
 // IR setup
-const int IR_PIN = 12;
 IRrecv recv(IR_PIN);
 decode_results irData;
 
@@ -52,7 +52,7 @@ void loop()
             {
                 Serial.print("Code 0x");
                 Serial.print(irData.value, HEX);
-                Serial.println(" is unknown.");
+                Serial.println(" is unknown or there was a problem with the LEDs.");
             }
             // Serial.println(irData.value, HEX);
             Serial.flush();
@@ -66,18 +66,20 @@ void loop()
  */
 int decodeRemoteCommands(const unsigned long *data)
 {
+    uint16_t index;
+    int (*func)(uint16_t,Area*);
+
     switch (*data)
     {
         case ALL_AREAS_CODE: // Power Button
         {    
             // We want to use a function to activate/deactivate all areas 
             // if one of the areas is activated then all will be deactivated and vice versa.
-            int (*func)(Area*);
             String msg = "";
-            if (!areas[0].state || 
-                !areas[1].state || 
-                !areas[2].state || 
-                !areas[3].state || 
+            if (!areas[0].state && 
+                !areas[1].state && 
+                !areas[2].state && 
+                !areas[3].state && 
                 !areas[4].state) 
             {
                 func = activateArea;
@@ -91,105 +93,72 @@ int decodeRemoteCommands(const unsigned long *data)
             Serial.println(msg);
 
             for(int i = 0; i < NUM_OF_AREAS; i++)
-                func(&areas[i]);
+                func(i, &areas[i]);
 
             return SUCCESS_CODE;
         }
         case AREA_ONE_CODE: // "1" Button
-            if(!areas[0].state)
-            {
-                Serial.println("Activating area 1...");
-                activateArea(&areas[0]);
-            }
-            else
-            {
-                Serial.println("Deactivating area 1...");
-                deactivateArea(&areas[0]);
-            }
-            
-            return SUCCESS_CODE;
+            index = 0;
+            break;
 
         case AREA_TWO_CODE: // "2" Button
-            if(!areas[1].state)
-            {
-                Serial.println("Activating area 2...");
-                activateArea(&areas[1]);
-            }
-            else
-            {
-                Serial.println("Deactivating area 2...");
-                deactivateArea(&areas[1]);
-            }
-            return SUCCESS_CODE;
+            index = 1;
+            break;
 
         case AREA_THREE_CODE: // "3" Button
-            if(!areas[2].state)
-            {
-                Serial.println("Activating area 3...");
-                activateArea(&areas[2]);
-            }
-            else
-            {
-                Serial.println("Deactivating area 3...");
-                deactivateArea(&areas[2]);
-            }
-            return SUCCESS_CODE;
+            index = 2;
+            break;
 
         case AREA_FOUR_CODE: // "4" Button
-            if(!areas[3].state)
-            {
-                Serial.println("Activating area 4...");
-                activateArea(&areas[3]);
-            }
-            else
-            {
-                Serial.println("Deactivating area 4...");
-                deactivateArea(&areas[3]);
-            }
-            return SUCCESS_CODE;
+            index = 3;
+            break;
 
         case AREA_FIVE_CODE: // "5" Button
-            if(!areas[4].state)
-            {
-                Serial.println("Activating area 5...");
-                activateArea(&areas[4]);
-            }
-            else
-            {
-                Serial.println("Deactivating area 5...");
-                deactivateArea(&areas[4]);
-            }
-            return SUCCESS_CODE;
+            index = 4;
+            break;
         
         default:
             return FAIL_CODE;
     }
 
-    return FAIL_CODE;
+    Area *area = &areas[index];
+
+    if(!(*area).state)
+    {
+        Serial.println("Activating " + (*area).name + "...");
+        func = activateArea;
+    }
+    else
+    {
+        Serial.println("Deactivating " + (*area).name + "...");
+        func = deactivateArea;
+    }
+
+    return func(index, area);
 }
 
 /**
  * Set all pixels in an area to white color
  */
-int activateArea(Area *area)
+int activateArea(uint16_t index, Area *area)
 {
-    Serial.print("Setting ");
-    Serial.print(area->name);
-    Serial.println(" to white");
+    Serial.println("Setting " + area->name + " to white");
     (*area).state = true;
-    return setArea(area, RgbColor(255));
+    fadeAreaColor(index, (*area).strip->GetPixelColor(0), WHITE_COLOR);
+    // return setArea(index, area, WHITE_COLOR);
+    return SUCCESS_CODE;
 }
 
 /**
  * Sets all pixels in an area to black
  */
-int deactivateArea(Area *area)
+int deactivateArea(uint16_t index, Area *area)
 {
-    Serial.print("Setting ");
-    Serial.print(area->name);
-    Serial.println(" to black");
+    Serial.println("Setting " + area->name + " to black");
     (*area).state = false;
-    return setArea(area, RgbColor(0));
+    fadeAreaColor(index, (*area).strip->GetPixelColor(0), BLACK_COLOR);
+    // return setArea(index, area, BLACK_COLOR);
+    return SUCCESS_CODE;
 }
 
 /**
@@ -200,4 +169,28 @@ int setArea(Area *area, RgbColor color)
     area->strip->ClearTo(color);
     area->strip->Show();
     return SUCCESS_CODE;
+}
+
+/**
+ * Animates the color fade using linear blend animation
+ */
+void blendAnimUpdate(const AnimationParam &param)
+{
+    RgbColor updatedColor = RgbColor::LinearBlend(
+        animStates[param.index].InitColor, 
+        animStates[param.index].InitColor, 
+        param.progress
+    );
+
+    areas[param.index].strip->ClearTo(updatedColor);
+}
+
+/**
+ * Starts the animation for color fade-in/fade-out
+ */
+void fadeAreaColor(uint16_t index, RgbColor initColor, RgbColor finColor)
+{
+    animStates[index].InitColor = initColor;
+    animStates[index].FinColor = finColor;
+    animations.StartAnimation(index, ANIM_TIME, blendAnimUpdate);
 }
