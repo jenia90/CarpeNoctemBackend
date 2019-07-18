@@ -20,7 +20,7 @@ typedef struct
     const uint8_t Pin;
     const String name;
     const unsigned long irCode;
-    NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> *strip;
+    NeoPixelBus<NeoRgbFeature, Neo800KbpsMethod> *strip;
     bool state;
 } Area; 
 

@@ -4,11 +4,11 @@
 
 // Define areas
 Area areas[NUM_OF_AREAS] = {
-    {5, 5, "Area 1", AREA_ONE_CODE, new NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod>(5, 5), false},
-    {5, 6, "Area 2", AREA_TWO_CODE, new NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod>(5, 6), false},
-    {5, 7, "Area 3", AREA_THREE_CODE, new NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod>(5, 7), false},
-    {5, 8, "Area 4", AREA_FOUR_CODE, new NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod>(5, 8), false},
-    {5, 9, "Area 5", AREA_FIVE_CODE, new NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod>(5, 9), false},
+    {5, 5, "Area 1", AREA_ONE_CODE, new NeoPixelBus<NeoRgbFeature, Neo800KbpsMethod>(5, 5), false},
+    {5, 6, "Area 2", AREA_TWO_CODE, new NeoPixelBus<NeoRgbFeature, Neo800KbpsMethod>(5, 6), false},
+    {5, 7, "Area 3", AREA_THREE_CODE, new NeoPixelBus<NeoRgbFeature, Neo800KbpsMethod>(5, 7), false},
+    {5, 8, "Area 4", AREA_FOUR_CODE, new NeoPixelBus<NeoRgbFeature, Neo800KbpsMethod>(5, 8), false},
+    {5, 9, "Area 5", AREA_FIVE_CODE, new NeoPixelBus<NeoRgbFeature, Neo800KbpsMethod>(5, 9), false}
 };
 
 NeoPixelAnimator animations(NUM_OF_AREAS);
@@ -144,9 +144,9 @@ int activateArea(uint16_t index, Area *area)
 {
     Serial.println("Setting " + area->name + " to white");
     (*area).state = true;
-    fadeAreaColor(index, (*area).strip->GetPixelColor(0), WHITE_COLOR);
-    // return setArea(index, area, WHITE_COLOR);
-    return SUCCESS_CODE;
+    // fadeAreaColor(index, BLACK_COLOR, WHITE_COLOR);
+    return setArea(area, WHITE_COLOR);
+    // return SUCCESS_CODE;
 }
 
 /**
@@ -156,9 +156,9 @@ int deactivateArea(uint16_t index, Area *area)
 {
     Serial.println("Setting " + area->name + " to black");
     (*area).state = false;
-    fadeAreaColor(index, (*area).strip->GetPixelColor(0), BLACK_COLOR);
-    // return setArea(index, area, BLACK_COLOR);
-    return SUCCESS_CODE;
+    // fadeAreaColor(index, WHITE_COLOR, BLACK_COLOR);
+    return setArea(area, BLACK_COLOR);
+    // return SUCCESS_CODE;
 }
 
 /**
@@ -178,7 +178,7 @@ void blendAnimUpdate(const AnimationParam &param)
 {
     RgbColor updatedColor = RgbColor::LinearBlend(
         animStates[param.index].InitColor, 
-        animStates[param.index].InitColor, 
+        animStates[param.index].FinColor, 
         param.progress
     );
 
@@ -190,7 +190,6 @@ void blendAnimUpdate(const AnimationParam &param)
  */
 void fadeAreaColor(uint16_t index, RgbColor initColor, RgbColor finColor)
 {
-    animStates[index].InitColor = initColor;
-    animStates[index].FinColor = finColor;
+    animStates[index] = {initColor, finColor};
     animations.StartAnimation(index, ANIM_TIME, blendAnimUpdate);
 }
